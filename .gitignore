@@ -1,0 +1,7 @@
+/out
+/toolchain
+Image
+Image.gz
+*.patch
+*.diff
+*.txt
