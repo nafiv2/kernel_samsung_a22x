@@ -464,10 +464,23 @@ static struct sysrq_key_op *sysrq_key_table[36] = {
 	 */
 	NULL,				/* a */
 	&sysrq_reboot_op,		/* b */
-	&sysrq_crash_op,		/* c */
-	&sysrq_showlocks_op,		/* d */
+#ifdef CONFIG_KEXEC_CORE
+        &sysrq_crash_op,                /* c */
+#else
+        NULL,                           /* c */
+#endif
+
+#ifdef CONFIG_LOCKDEP
+	&sysrq_showlocks_op,            /* d */
+#else
+	NULL,                           /* d */
+#endif
 	&sysrq_term_op,			/* e */
-	&sysrq_moom_op,			/* f */
+#ifdef CONFIG_OOM_KILLER
+        &sysrq_moom_op,                 /* f */
+#else
+        NULL,                           /* f */
+#endif
 	/* g: May be registered for the kernel debugger */
 	NULL,				/* g */
 	NULL,				/* h - reserved for help */
@@ -477,32 +490,55 @@ static struct sysrq_key_op *sysrq_key_table[36] = {
 #else
 	NULL,				/* j */
 #endif
-	&sysrq_SAK_op,			/* k */
+#ifdef CONFIG_VT_CONSOLE
+	&sysrq_SAK_op,                  /* k */
+#else
+	NULL,                           /* k */
+#endif
 #ifdef CONFIG_SMP
 	&sysrq_showallcpus_op,		/* l */
 #else
 	NULL,				/* l */
 #endif
 	&sysrq_showmem_op,		/* m */
-	&sysrq_unrt_op,			/* n */
+#ifdef CONFIG_PREEMPT_RT
+        &sysrq_unrt_op,                 /* n */
+#else
+        NULL,                           /* n */
+#endif
 	/* o: This will often be registered as 'Off' at init time */
 	NULL,				/* o */
 	&sysrq_showregs_op,		/* p */
-	&sysrq_show_timers_op,		/* q */
-	&sysrq_unraw_op,		/* r */
-	&sysrq_sync_op,			/* s */
-	&sysrq_showstate_op,		/* t */
-	&sysrq_mountro_op,		/* u */
-	/* v: May be registered for frame buffer console restore */
-	NULL,				/* v */
-	&sysrq_showstate_blocked_op,	/* w */
-	/* x: May be registered on mips for TLB dump */
-	/* x: May be registered on ppc/powerpc for xmon */
-	/* x: May be registered on sparc64 for global PMU dump */
-	NULL,				/* x */
-	/* y: May be registered on sparc64 for global register dump */
-	NULL,				/* y */
-	&sysrq_ftrace_dump_op,		/* z */
+#ifdef CONFIG_TIMER_STATS
+        &sysrq_show_timers_op,          /* q */
+#else
+        NULL,                           /* q */
+#endif
+#ifdef CONFIG_VT_CONSOLE
+        &sysrq_unraw_op,                /* r */
+#else
+        NULL,                           /* r */
+#endif
+#ifdef CONFIG_BLOCK
+        &sysrq_sync_op,                 /* s */
+#else
+        NULL,                           /* s */
+#endif
+	&sysrq_showstate_op,            /* t */
+#ifdef CONFIG_BLOCK
+        &sysrq_mountro_op,              /* u */
+#else
+        NULL,                           /* u */
+#endif
+        NULL,                           /* v */
+        &sysrq_showstate_blocked_op,    /* w */
+        NULL,                           /* x */
+        NULL,                           /* y */
+#ifdef CONFIG_FTRACE
+        &sysrq_ftrace_dump_op,          /* z */
+#else
+        NULL,                           /* z */
+#endif
 };
 
 /* key2index calculation, -1 on invalid index */

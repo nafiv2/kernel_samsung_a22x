@@ -1048,7 +1048,7 @@ int connsys_dedicated_log_path_apsoc_init(
 #else
 	init_timer(&gDev.workTimer);
 #endif
-	gDev.workTimer.function = work_timer_handler;
+	gDev.workTimer.function = (void (*)(unsigned long))work_timer_handler;
 	spin_lock_init(&gDev.irq_lock);
 	INIT_WORK(&gDev.logDataWorker, connlog_log_data_handler);
 	if (connlog_eirq_init(irq_config)) {
