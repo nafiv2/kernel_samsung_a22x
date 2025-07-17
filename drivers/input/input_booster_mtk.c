@@ -134,7 +134,7 @@ void input_booster_init_vendor(int* release_val)
 	}
 }
 
-void input_booster_exit_vendor()
+void input_booster_exit_vendor(void)
 {
 	pm_qos_remove_request(&ddr_pm_qos_request);
 }
