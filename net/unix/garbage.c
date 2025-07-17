@@ -171,17 +171,17 @@ static void scan_children(struct sock *x, void (*func)(struct unix_sock *),
 
 static void dec_inflight(struct unix_sock *usk)
 {
-	usk->inflight--;
+	atomic_long_dec(&usk->inflight);
 }
 
 static void inc_inflight(struct unix_sock *usk)
 {
-	usk->inflight++;
+	atomic_long_inc(&usk->inflight);
 }
 
 static void inc_inflight_move_tail(struct unix_sock *u)
 {
-	u->inflight++;
+	atomic_long_inc(&u->inflight);
 
 	/* If this still might be part of a cycle, move it to the end
 	 * of the list, so that it's checked even if it was already
@@ -256,9 +256,9 @@ void unix_gc(void)
 
 		total_refs = file_count(sk->sk_socket->file);
 
-		BUG_ON(!u->inflight);
-		BUG_ON(total_refs < u->inflight);
-		if (total_refs == u->inflight) {
+		BUG_ON(!atomic_long_read(&u->inflight));
+		BUG_ON(total_refs < atomic_long_read(&u->inflight));
+			if (total_refs == atomic_long_read(&u->inflight)) {
 			list_move_tail(&u->link, &gc_candidates);
 			__set_bit(UNIX_GC_CANDIDATE, &u->gc_flags);
 			__set_bit(UNIX_GC_MAYBE_CYCLE, &u->gc_flags);
@@ -290,7 +290,7 @@ void unix_gc(void)
 		/* Move cursor to after the current position. */
 		list_move(&cursor, &u->link);
 
-		if (u->inflight) {
+		if (atomic_long_read(&u->inflight)) {
 			list_move_tail(&u->link, &not_cycle_list);
 			__clear_bit(UNIX_GC_MAYBE_CYCLE, &u->gc_flags);
 			scan_children(&u->sk, inc_inflight_move_tail, NULL);
