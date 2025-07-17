@@ -1465,7 +1465,7 @@ struct uncached_list {
 
 static DEFINE_PER_CPU_ALIGNED(struct uncached_list, rt_uncached_list);
 
-static void rt_add_uncached_list(struct rtable *rt)
+void rt_add_uncached_list(struct rtable *rt)
 {
 	struct uncached_list *ul = raw_cpu_ptr(&rt_uncached_list);
 
@@ -1474,6 +1474,30 @@ static void rt_add_uncached_list(struct rtable *rt)
 	spin_lock_bh(&ul->lock);
 	list_add_tail(&rt->rt_uncached, &ul->head);
 	spin_unlock_bh(&ul->lock);
+}
+
+void rt_del_uncached_list(struct rtable *rt)
+{
+	if (!list_empty(&rt->rt_uncached)) {
+		struct uncached_list *ul = rt->rt_uncached_list;
+
+		if (ul) {
+			spin_lock_bh(&ul->lock);
+			list_del(&rt->rt_uncached);
+			spin_unlock_bh(&ul->lock);
+		}
+	}
+}
+
+static void ipv4_dst_destroy(struct dst_entry *dst)
+{
+	struct dst_metrics *p = (struct dst_metrics *)DST_METRICS_PTR(dst);
+	struct rtable *rt = (struct rtable *)dst;
+
+	if (p != &dst_default_metrics && refcount_dec_and_test(&p->refcnt))
+		kfree(p);
+
+	rt_del_uncached_list(rt);
 }
 
 static bool rt_cache_route(struct fib_nh *nh, struct rtable *rt)
@@ -1488,9 +1512,6 @@ static bool rt_cache_route(struct fib_nh *nh, struct rtable *rt)
 	}
 	orig = *p;
 
-	/* hold dst before doing cmpxchg() to avoid race condition
-	 * on this dst
-	 */
 	dst_hold(&rt->dst);
 	prev = cmpxchg(p, orig, rt);
 	if (prev == orig) {
@@ -1504,56 +1525,6 @@ static bool rt_cache_route(struct fib_nh *nh, struct rtable *rt)
 	}
 
 	return ret;
-}
-
-struct uncached_list {
-	spinlock_t		lock;
-	struct list_head	head;
-};
-
-static DEFINE_PER_CPU_ALIGNED(struct uncached_list, rt_uncached_list);
-
-void rt_add_uncached_list(struct rtable *rt)
-{
-	struct uncached_list *ul = raw_cpu_ptr(&rt_uncached_list);
-
-	rt->rt_uncached_list = ul;
-
-	spin_lock_bh(&ul->lock);
-	list_add_tail(&rt->rt_uncached, &ul->head);
-	spin_unlock_bh(&ul->lock);
-}
-
-/*
- * Ini adalah fungsi yang benar, gabungan dari header di HEAD
- * dan body yang nyasar di bagian upstream
- */
-void rt_del_uncached_list(struct rtable *rt)
-{
-	if (!list_empty(&rt->rt_uncached)) {
-		struct uncached_list *ul = rt->rt_uncached_list;
-
-		if (ul) {
-			spin_lock_bh(&ul->lock);
-			list_del(&rt->rt_uncached);
-			spin_unlock_bh(&ul->lock);
-		}
-	}
-}
-
-/*
- * Ini adalah definisi ipv4_dst_destroy yang benar dari upstream,
- * kita hanya pakai satu ini saja.
- */
-static void ipv4_dst_destroy(struct dst_entry *dst)
-{
-	struct dst_metrics *p = (struct dst_metrics *)DST_METRICS_PTR(dst);
-	struct rtable *rt = (struct rtable *)dst;
-
-	if (p != &dst_default_metrics && refcount_dec_and_test(&p->refcnt))
-		kfree(p);
-
-	rt_del_uncached_list(rt);
 }
 
 void rt_flush_dev(struct net_device *dev)
@@ -1604,34 +1575,20 @@ static void rt_set_nexthop(struct rtable *rt, __be32 daddr,
 			rt->dst._metrics |= DST_METRICS_REFCOUNTED;
 			refcount_inc(&fi->fib_metrics->refcnt);
 		}
-	}
-#ifdef CONFIG_IP_ROUTE_CLASSID
-		rt->dst.tclassid = nh->nh_tclassid;
-#endif
-		rt->dst.lwtstate = lwtstate_get(nh->nh_lwtstate);
-		if (unlikely(fnhe))
-			cached = rt_bind_exception(rt, fnhe, daddr, do_cache);
-		else if (do_cache)
-			cached = rt_cache_route(nh, rt);
-		if (unlikely(!cached)) {
-			/* Routes we intend to cache in nexthop exception or
-			 * FIB nexthop have the DST_NOCACHE bit clear.
-			 * However, if we are unsuccessful at storing this
-			 * route into the cache we really need to set it.
-			 */
-			if (!rt->rt_gateway)
-				rt->rt_gateway = daddr;
-			rt_add_uncached_list(rt);
-		}
-	} else
-		rt_add_uncached_list(rt);
 
-#ifdef CONFIG_IP_ROUTE_CLASSID
-#ifdef CONFIG_IP_MULTIPLE_TABLES
-	set_class_tag(rt, res->tclassid);
-#endif
-	set_class_tag(rt, itag);
-#endif
+		if (do_cache) {
+			if (nh->nh_lwtstate)
+				rt->dst.lwtstate = lwtstate_get(nh->nh_lwtstate);
+
+			if (!rt->dst.lwtstate)
+				cached = rt_cache_route(nh, rt);
+		}
+	} else {
+		dst_init_metrics(&rt->dst, dst_default_metrics.metrics, true);
+	}
+
+	if (!cached)
+		rt_add_uncached_list(rt);
 }
 
 struct rtable *rt_dst_alloc(struct net_device *dev,

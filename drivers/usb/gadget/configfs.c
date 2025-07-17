@@ -11,7 +11,7 @@
 #ifdef CONFIG_MTPROF
 #include "bootprof.h"
 #endif
-
+#define USB_MAX_STRING_WITH_NULL_LEN (USB_MAX_STRING_LEN + 1)
 #ifdef CONFIG_USB_NOTIFY_PROC_LOG
 #include <linux/usblog_proc_notify.h>
 #endif
