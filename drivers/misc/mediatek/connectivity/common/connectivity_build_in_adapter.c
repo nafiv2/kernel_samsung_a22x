@@ -87,10 +87,9 @@
 
 
 
-phys_addr_t gConEmiPhyBase;
-EXPORT_SYMBOL(gConEmiPhyBase);
-unsigned long long gConEmiSize;
-EXPORT_SYMBOL(gConEmiSize);
+extern phys_addr_t gConEmiPhyBase;
+extern unsigned long long gConEmiSize;
+
 
 phys_addr_t gGpsRsvMemPhyBase;
 EXPORT_SYMBOL(gGpsRsvMemPhyBase);
